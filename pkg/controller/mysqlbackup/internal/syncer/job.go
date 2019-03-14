@@ -82,14 +82,6 @@ func (s *jobSyncer) SyncFn(in runtime.Object) error {
 	return nil
 }
 
-func (s *jobSyncer) getBackupSecretName() string {
-	if len(s.backup.Spec.BackupSecretName) > 0 {
-		return s.backup.Spec.BackupSecretName
-	}
-
-	return s.cluster.Spec.BackupSecretName
-}
-
 // getBackupCandidate returns the hostname of the first not-lagged and
 // replicating slave node, else returns the master node.
 func (s *jobSyncer) getBackupCandidate() string {
@@ -163,12 +155,12 @@ func (s *jobSyncer) ensurePodSpec(in core.PodSpec) core.PodSpec {
 		},
 	}
 
-	if len(s.getBackupSecretName()) != 0 {
+	if len(s.backup.Spec.BackupSecretName) != 0 {
 		in.Containers[0].EnvFrom = []core.EnvFromSource{
 			core.EnvFromSource{
 				SecretRef: &core.SecretEnvSource{
 					LocalObjectReference: core.LocalObjectReference{
-						Name: s.getBackupSecretName(),
+						Name: s.backup.Spec.BackupSecretName,
 					},
 				},
 			},

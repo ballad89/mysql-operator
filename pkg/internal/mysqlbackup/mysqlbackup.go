@@ -52,11 +52,6 @@ func (b *MysqlBackup) Unwrap() *api.MysqlBackup {
 	return b.MysqlBackup
 }
 
-// GetNameForJob returns the name of the job
-func (b *MysqlBackup) GetNameForJob() string {
-	return fmt.Sprintf("%s-bjob", b.Name)
-}
-
 // GetBackupURL returns a backup URL
 func (b *MysqlBackup) GetBackupURL(cluster *mysqlcluster.MysqlCluster) string {
 	if strings.HasSuffix(b.Spec.BackupURL, BackupSuffix) {
@@ -85,6 +80,11 @@ func (b *MysqlBackup) composeBackupURL(base string) string {
 	timestamp := time.Now().Format("2006-01-02T15:04:05")
 	fileName := fmt.Sprintf("/%s-%s.%s", b.Spec.ClusterName, timestamp, BackupSuffix)
 	return base + fileName
+}
+
+// GetNameForJob returns the name of the job
+func (b *MysqlBackup) GetNameForJob() string {
+	return fmt.Sprintf("%s-bjob", b.Name)
 }
 
 //GetNameForDeletionJob returns the name for the hard deletion job.

@@ -139,9 +139,19 @@ func (r *ReconcileMysqlBackup) Reconcile(request reconcile.Request) (reconcile.R
 		return reconcile.Result{}, fmt.Errorf("cluster name is not specified")
 	}
 
-	deletionJobSyncer := backupSyncer.NewRemoteJobSyncer(r.Client, r.scheme, backup, r.opt)
+	// get related cluster
+	var cluster *mysqlcluster.MysqlCluster
+	if cluster, err = r.getRelatedCluster(backup); err != nil {
+		return reconcile.Result{}, fmt.Errorf("cluster not found: %s", err)
+	}
+
+	deletionJobSyncer := backupSyncer.NewRemoteJobSyncer(r.Client, r.scheme, backup, cluster, r.opt, r.recorder)
 	err = syncer.Sync(context.TODO(), deletionJobSyncer, r.recorder)
 	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	if err = r.updateBackup(savedBackup, backup); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -150,12 +160,6 @@ func (r *ReconcileMysqlBackup) Reconcile(request reconcile.Request) (reconcile.R
 		// silence skip it
 		log.V(1).Info("backup already completed", "name", backup.Name)
 		return reconcile.Result{}, nil
-	}
-
-	// get related cluster
-	var cluster *mysqlcluster.MysqlCluster
-	if cluster, err = r.getRelatedCluster(backup); err != nil {
-		return reconcile.Result{}, fmt.Errorf("cluster not found: %s", err)
 	}
 
 	// set defaults for the backup base on the related cluster
@@ -168,11 +172,8 @@ func (r *ReconcileMysqlBackup) Reconcile(request reconcile.Request) (reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	// update spec if modified
-	if !reflect.DeepEqual(savedBackup, backup.Unwrap()) {
-		if err = r.Update(context.TODO(), backup.Unwrap()); err != nil {
-			return reconcile.Result{}, err
-		}
+	if err = r.updateBackup(savedBackup, backup); err != nil {
+		return reconcile.Result{}, err
 	}
 
 	return reconcile.Result{}, nil
@@ -186,4 +187,13 @@ func (r *ReconcileMysqlBackup) getRelatedCluster(backup *mysqlbackup.MysqlBackup
 	}
 
 	return cluster, nil
+}
+
+func (r *ReconcileMysqlBackup) updateBackup(savedBackup *mysqlv1alpha1.MysqlBackup, backup *mysqlbackup.MysqlBackup) error {
+	if !reflect.DeepEqual(savedBackup, backup.Unwrap()) {
+		if err := r.Update(context.TODO(), backup.Unwrap()); err != nil {
+			return err
+		}
+	}
+	return nil
 }
